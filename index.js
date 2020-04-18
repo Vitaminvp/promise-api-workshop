@@ -25,34 +25,104 @@ class CustomPromise extends Promise {
   // If the value is a thenable, attempts to unwrap that thenable before outputting a value
   static resolve(value) {
     // 👉
+    return new Promise((resolve) => resolve(value));
   }
   // Accepts a value, returns a Promise rejected with that value.
   static reject(value) {
     // 👉
+    return new Promise((resolve, reject) => reject(value));
   }
   // Accepts an iterable of Promises, fires each one simultaneously and outputs a Promise.
   // If at least one Promise in the passed iterable was rejected, the output Promise is immediately rejected with reason of that rejected Promise.
   // If at least one Promise in the passed iterable was resolved, the output Promise is immediately resolved with reason of that resolved Promise.
   static race(iterable) {
     // 👉
+    if (!Array.isArray(iterable)) throw new TypeError("Non-array inputs");
+
+    return new Promise((resolve, reject) => {
+      iterable.forEach((promise) => {
+        Promise.resolve(promise).then(resolve, reject);
+      });
+    });
   }
   // Accepts an iterable of Promises, fires each one simultaneously and outputs a Promise.
   // If at least one Promise in the passed iterable was rejected, the output Promise is immediately rejected with reason of that rejected Promise.
   // If all Promises in the passed iterable were resolved, put them in an array and resolve the output Promise with that array.
   static all(iterable) {
     // 👉
+    if (!Array.isArray(iterable)) throw new TypeError("Non-array inputs");
+
+    const results = [];
+    let completedPromises = 0;
+    return new Promise((resolve, reject) => {
+      iterable.forEach((promise, i) => {
+        // probably a promise
+        Promise.resolve(promise)
+          .then((value) => {
+            results[i] = value;
+            completedPromises += 1;
+            if (completedPromises === iterable.length) resolve(results);
+          })
+          .catch(reject);
+      });
+    });
   }
   // Accepts an iterable of Promises, fires each one simultaneously and outputs a Promise.
   // If at least one Promise in the passed iterable was resolved, the output Promise is immediately resolved with value of that resolved Promise.
   // If all Promises in the passed iterable were rejected, put them in an array and reject the output Promise with that array.
   static any(iterable) {
     // 👉
+    if (!Array.isArray(iterable)) throw new TypeError("Non-array inputs");
+
+    const results = [];
+    let completedPromises = 0;
+    return new Promise((resolve, reject) => {
+      iterable.forEach((promise, i) => {
+        if (typeof promise.then === "function") {
+          // probably a promise
+          promise
+            .then((value) => {
+              resolve(value);
+            })
+            .catch((err) => {
+              results[i] = err;
+              if (++completedPromises === iterable.length) {
+                reject(results);
+              }
+            });
+        } else {
+          // definitely not a promise
+          resolve(promise);
+        }
+      });
+    });
   }
   // Accepts an iterable of Promises, fires each one simultaneously and outputs a Promise.
   // If all Promises in the passed iterable were resolved or rejected, put them in an array and resolve the output Promise with an array of state snapshots, e.g.:
   // [{ status: 'fulfilled', value: v }, { status: 'rejected', reason: error }].
   static allSettled(iterable) {
     // 👉
+    if (!Array.isArray(iterable)) throw Error("Non-array inputs");
+
+    const results = [];
+    let completedPromises = 0;
+    return new Promise((resolve) => {
+      iterable.forEach((promise, i) => {
+        Promise.resolve(promise)
+          .then((value) => {
+            results[i] = { status: "fulfilled", value };
+          })
+          .catch((reason) => {
+            results[i] = { status: "rejected", reason };
+          })
+          .finally(() => {
+            completedPromises += 1;
+            if (completedPromises === iterable.length) {
+              resolve(results);
+            }
+          });
+      });
+    });
   }
 }
 
